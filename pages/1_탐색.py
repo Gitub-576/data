@@ -1,8 +1,7 @@
 
 import streamlit as st
 import pandas as pd
-import json
-import os
+import plotly.express as px
 
 
 # ==========================================
@@ -10,14 +9,14 @@ import os
 # ==========================================
 
 st.set_page_config(
-    page_title="뇌졸중 예측 실습실",
-    page_icon="🧠",
+    page_title="탐색 | 뇌졸중 예측 실습실",
+    page_icon="🔎",
     layout="wide"
 )
 
 
 # ==========================================
-# 2. 기본 설정
+# 2. 데이터 불러오기
 # ==========================================
 
 DATA_URL = (
@@ -25,108 +24,39 @@ DATA_URL = (
     "greatsong/modudata/main/data/stroke.csv"
 )
 
-SAVE_FOLDER = "내_기록"
-SAVE_FILE = os.path.join(SAVE_FOLDER, "기록.json")
-
-
-# ==========================================
-# 3. 데이터 불러오기
-# ==========================================
 
 @st.cache_data
 def load_data():
-    return pd.read_csv(
+
+    df = pd.read_csv(
         DATA_URL,
         encoding="utf-8"
     )
 
+    return df
+
 
 try:
+
     df = load_data()
 
 except Exception as e:
+
     st.error("데이터를 불러오는 중 오류가 발생했습니다.")
     st.error(str(e))
     st.stop()
 
 
 # ==========================================
-# 4. 기록 불러오기
+# 3. 제목
 # ==========================================
 
-def load_records():
-
-    if os.path.exists(SAVE_FILE):
-
-        try:
-            with open(
-                SAVE_FILE,
-                "r",
-                encoding="utf-8"
-            ) as file:
-
-                return json.load(file)
-
-        except (json.JSONDecodeError, OSError):
-            return {
-                "translations": {},
-                "source": ""
-            }
-
-    return {
-        "translations": {},
-        "source": ""
-    }
-
-
-if "records" not in st.session_state:
-    st.session_state.records = load_records()
-
-
-# ==========================================
-# 5. 기록 저장하기
-# ==========================================
-
-def save_records(translations, source):
-
-    os.makedirs(
-        SAVE_FOLDER,
-        exist_ok=True
-    )
-
-    records = {
-        "translations": translations,
-        "source": source
-    }
-
-    with open(
-        SAVE_FILE,
-        "w",
-        encoding="utf-8"
-    ) as file:
-
-        json.dump(
-            records,
-            file,
-            ensure_ascii=False,
-            indent=4
-        )
-
-    st.session_state.records = records
-
-
-# ==========================================
-# 6. 앱 제목
-# ==========================================
-
-st.title("🧠 뇌졸중 예측 실습실")
+st.title("🔎 데이터 탐색")
 
 st.markdown(
     """
-    뇌졸중 예측에 사용되는 데이터를 살펴보고,
-    데이터의 구조와 각 변수의 의미를 학습하는 공간입니다.
-
-    먼저 데이터를 탐색하고 각 열의 의미를 직접 정리해 봅시다.
+    데이터를 다양한 그래프와 표로 살펴보면서
+    사람들의 건강 상태와 뇌졸중 발생 사이의 관계를 탐색합니다.
     """
 )
 
@@ -134,244 +64,549 @@ st.divider()
 
 
 # ==========================================
-# 7. 데이터 소개
+# 4. 나이와 평균 혈당 분포
 # ==========================================
 
-st.header("📊 데이터 소개")
+st.header("1. 나이와 평균 혈당의 분포")
 
 st.markdown(
     """
-    이 데이터는 사람들의 건강 상태와 생활 습관 정보를 담고 있으며,
-    뇌졸중 발생 여부를 예측하는 데 활용할 수 있습니다.
-
-    한 행은 한 사람의 정보를 나타내며,
-    `stroke` 열은 뇌졸중 발생 여부를 나타냅니다.
+    히스토그램을 이용하여 사람들의 나이와 평균 혈당이
+    어떤 범위에 많이 분포하는지 살펴봅니다.
     """
 )
 
-
-# ==========================================
-# 8. 주요 통계 카드
-# ==========================================
-
-total_people = len(df)
-total_columns = len(df.columns)
-
-stroke_count = int(
-    (df["stroke"] == 1).sum()
-)
-
-stroke_ratio = (
-    stroke_count / total_people * 100
-    if total_people > 0
-    else 0
-)
-
-col1, col2, col3, col4 = st.columns(4)
+col1, col2 = st.columns(2)
 
 with col1:
-    st.metric("👥 전체 사람 수", f"{total_people:,}명")
+
+    fig_age = px.histogram(
+        df,
+        x="age",
+        nbins=30,
+        title="나이 분포",
+        labels={
+            "age": "나이",
+            "count": "사람 수"
+        },
+        color_discrete_sequence=["#4C78A8"]
+    )
+
+    fig_age.update_layout(
+        xaxis_title="나이",
+        yaxis_title="사람 수",
+        bargap=0.05
+    )
+
+    st.plotly_chart(
+        fig_age,
+        use_container_width=True
+    )
+
 
 with col2:
-    st.metric("📋 전체 열 개수", f"{total_columns}개")
 
-with col3:
-    st.metric("🧠 뇌졸중 발생 인원", f"{stroke_count:,}명")
+    fig_glucose = px.histogram(
+        df,
+        x="avg_glucose_level",
+        nbins=30,
+        title="평균 혈당 분포",
+        labels={
+            "avg_glucose_level": "평균 혈당",
+            "count": "사람 수"
+        },
+        color_discrete_sequence=["#F58518"]
+    )
 
-with col4:
-    st.metric("📈 뇌졸중 발생 비율", f"{stroke_ratio:.2f}%")
+    fig_glucose.update_layout(
+        xaxis_title="평균 혈당",
+        yaxis_title="사람 수",
+        bargap=0.05
+    )
+
+    st.plotly_chart(
+        fig_glucose,
+        use_container_width=True
+    )
 
 
 st.divider()
 
 
 # ==========================================
-# 9. 열 이름 및 변수 정보
+# 5. 뇌졸중 여부에 따른 나이와 평균 혈당 비교
 # ==========================================
 
-st.header("📝 데이터 열 살펴보기")
+st.header("2. 뇌졸중 여부에 따른 비교")
 
 st.markdown(
     """
-    각 열의 우리말 뜻을 교재를 참고하여 직접 작성해 보세요.
+    뇌졸중을 겪은 사람과 겪지 않은 사람의
+    나이와 평균 혈당 분포를 상자그림으로 비교합니다.
 
-    작성한 내용은 저장 버튼을 누르면 JSON 파일에 저장됩니다.
+    상자 안의 가로선은 중앙값을 나타내며,
+    표에는 두 집단의 평균값을 함께 표시합니다.
     """
 )
 
-saved_translations = st.session_state.records.get(
-    "translations", {}
+
+# 그룹 이름 만들기
+df["stroke_group"] = df["stroke"].map({
+    0: "뇌졸중 없음",
+    1: "뇌졸중 있음"
+})
+
+
+col1, col2 = st.columns(2)
+
+with col1:
+
+    fig_box_age = px.box(
+        df,
+        x="stroke_group",
+        y="age",
+        color="stroke_group",
+        title="뇌졸중 여부에 따른 나이 비교",
+        labels={
+            "stroke_group": "뇌졸중 여부",
+            "age": "나이"
+        },
+        category_orders={
+            "stroke_group": [
+                "뇌졸중 없음",
+                "뇌졸중 있음"
+            ]
+        },
+        color_discrete_map={
+            "뇌졸중 없음": "#4C78A8",
+            "뇌졸중 있음": "#E45756"
+        }
+    )
+
+    fig_box_age.update_layout(
+        showlegend=False
+    )
+
+    st.plotly_chart(
+        fig_box_age,
+        use_container_width=True
+    )
+
+
+with col2:
+
+    fig_box_glucose = px.box(
+        df,
+        x="stroke_group",
+        y="avg_glucose_level",
+        color="stroke_group",
+        title="뇌졸중 여부에 따른 평균 혈당 비교",
+        labels={
+            "stroke_group": "뇌졸중 여부",
+            "avg_glucose_level": "평균 혈당"
+        },
+        category_orders={
+            "stroke_group": [
+                "뇌졸중 없음",
+                "뇌졸중 있음"
+            ]
+        },
+        color_discrete_map={
+            "뇌졸중 없음": "#4C78A8",
+            "뇌졸중 있음": "#E45756"
+        }
+    )
+
+    fig_box_glucose.update_layout(
+        showlegend=False
+    )
+
+    st.plotly_chart(
+        fig_box_glucose,
+        use_container_width=True
+    )
+
+
+# 평균값 계산
+mean_df = (
+    df.groupby("stroke_group")[
+        ["age", "avg_glucose_level"]
+    ]
+    .mean()
+    .reindex([
+        "뇌졸중 없음",
+        "뇌졸중 있음"
+    ])
+    .reset_index()
 )
 
-column_info = []
+mean_df.columns = [
+    "뇌졸중 여부",
+    "평균 나이",
+    "평균 혈당"
+]
 
-for column in df.columns:
+mean_df["평균 나이"] = mean_df["평균 나이"].round(2)
+mean_df["평균 혈당"] = mean_df["평균 혈당"].round(2)
 
-    unique_count = df[column].nunique(dropna=True)
-
-    if pd.api.types.is_numeric_dtype(df[column]):
-
-        if unique_count <= 10:
-            value_type = "범주형"
-        else:
-            value_type = "수치형"
-
-    else:
-        value_type = "범주형"
-
-    column_info.append({
-        "열 이름": column,
-        "우리말 뜻": saved_translations.get(column, ""),
-        "값의 종류": value_type,
-        "빈 값 개수": int(df[column].isna().sum())
-    })
-
-
-info_df = pd.DataFrame(column_info)
-
-edited_df = st.data_editor(
-    info_df,
-    use_container_width=True,
-    hide_index=True,
-    disabled=[
-        "열 이름",
-        "값의 종류",
-        "빈 값 개수"
-    ],
-    column_config={
-        "열 이름": st.column_config.TextColumn(
-            "열 이름",
-            width="medium"
-        ),
-        "우리말 뜻": st.column_config.TextColumn(
-            "우리말 뜻 (직접 입력)",
-            width="large"
-        ),
-        "값의 종류": st.column_config.TextColumn(
-            "값의 종류",
-            width="medium"
-        ),
-        "빈 값 개수": st.column_config.NumberColumn(
-            "빈 값 개수",
-            width="small"
-        )
-    },
-    key="column_editor"
-)
-
-
-# ==========================================
-# 10. 데이터 처음 다섯 줄
-# ==========================================
-
-st.divider()
-
-st.header("🔍 데이터 미리보기")
-
-st.markdown(
-    "실제 CSV 파일에 저장된 데이터의 처음 다섯 행입니다."
-)
+st.subheader("두 집단의 평균값 비교")
 
 st.dataframe(
-    df.head(5),
+    mean_df,
     use_container_width=True,
     hide_index=True
 )
 
 
-# ==========================================
-# 11. 데이터 출처 입력
-# ==========================================
-
 st.divider()
 
-st.header("📚 데이터 출처")
-
-st.markdown(
-    "교재에 소개된 데이터 출처를 아래에 작성해 보세요."
-)
-
-saved_source = st.session_state.records.get(
-    "source", ""
-)
-
-source_text = st.text_area(
-    "데이터 출처 작성",
-    value=saved_source,
-    placeholder="교재를 참고하여 데이터 출처를 입력하세요.",
-    height=120,
-    key="source_editor"
-)
-
 
 # ==========================================
-# 12. 저장 버튼
+# 6. 고혈압과 심장병에 따른 뇌졸중 비율
 # ==========================================
 
-st.divider()
-
-col_save, col_info = st.columns([1, 3])
-
-with col_save:
-
-    if st.button(
-        "💾 기록 저장하기",
-        use_container_width=True,
-        type="primary"
-    ):
-
-        translations = {}
-
-        for _, row in edited_df.iterrows():
-
-            translations[row["열 이름"]] = (
-                row["우리말 뜻"]
-                if pd.notna(row["우리말 뜻"])
-                else ""
-            )
-
-        try:
-
-            save_records(
-                translations,
-                source_text
-            )
-
-            st.success(
-                "우리말 뜻과 데이터 출처가 저장되었습니다!"
-            )
-
-        except OSError as e:
-
-            st.error(
-                f"파일 저장 중 오류가 발생했습니다: {e}"
-            )
-
-
-with col_info:
-
-    st.caption(
-        "저장된 내용은 내_기록/기록.json 파일에 보관됩니다. "
-        "앱을 다시 실행하거나 새로고침해도 저장된 내용을 불러옵니다."
-    )
-
-
-# ==========================================
-# 13. 마무리
-# ==========================================
-
-st.divider()
+st.header("3. 질병 여부에 따른 뇌졸중 비율")
 
 st.markdown(
     """
-    ### 🎯 학습 목표
+    고혈압과 심장병이 있는 집단과 없는 집단을 나누어
+    각각의 뇌졸중 발생 비율을 비교합니다.
+    """
+)
 
-    - 데이터의 전체적인 구조 이해하기
-    - 각 열의 의미 파악하기
-    - 결측치가 있는 열 확인하기
-    - 뇌졸중 발생 여부(stroke) 이해하기
 
-    **이제 데이터를 직접 살펴보며 뇌졸중 예측을 위한
-    첫 번째 데이터 탐색을 시작해 봅시다!**
+# 비율 계산 함수
+def calculate_stroke_rate(data, column):
+
+    result = (
+        data.groupby(column)
+        .agg(
+            전체_사람수=("stroke", "count"),
+            뇌졸중_인원=("stroke", "sum")
+        )
+        .reset_index()
+    )
+
+    result["뇌졸중_비율"] = (
+        result["뇌졸중_인원"]
+        / result["전체_사람수"]
+        * 100
+    )
+
+    return result
+
+
+# 고혈압
+hypertension_df = calculate_stroke_rate(
+    df,
+    "hypertension"
+)
+
+hypertension_df["구분"] = hypertension_df[
+    "hypertension"
+].map({
+    0: "고혈압 없음",
+    1: "고혈압 있음"
+})
+
+
+# 심장병
+heart_df = calculate_stroke_rate(
+    df,
+    "heart_disease"
+)
+
+heart_df["구분"] = heart_df[
+    "heart_disease"
+].map({
+    0: "심장병 없음",
+    1: "심장병 있음"
+})
+
+
+col1, col2 = st.columns(2)
+
+with col1:
+
+    fig_hypertension = px.bar(
+        hypertension_df,
+        x="구분",
+        y="뇌졸중_비율",
+        text="뇌졸중_비율",
+        title="고혈압 여부에 따른 뇌졸중 비율",
+        labels={
+            "구분": "고혈압 여부",
+            "뇌졸중_비율": "뇌졸중 비율 (%)"
+        },
+        color="구분",
+        color_discrete_map={
+            "고혈압 없음": "#4C78A8",
+            "고혈압 있음": "#E45756"
+        }
+    )
+
+    fig_hypertension.update_traces(
+        texttemplate="%{text:.2f}%",
+        textposition="outside"
+    )
+
+    fig_hypertension.update_layout(
+        showlegend=False,
+        yaxis_title="뇌졸중 비율 (%)",
+        xaxis_title="고혈압 여부"
+    )
+
+    st.plotly_chart(
+        fig_hypertension,
+        use_container_width=True
+    )
+
+
+with col2:
+
+    fig_heart = px.bar(
+        heart_df,
+        x="구분",
+        y="뇌졸중_비율",
+        text="뇌졸중_비율",
+        title="심장병 여부에 따른 뇌졸중 비율",
+        labels={
+            "구분": "심장병 여부",
+            "뇌졸중_비율": "뇌졸중 비율 (%)"
+        },
+        color="구분",
+        color_discrete_map={
+            "심장병 없음": "#4C78A8",
+            "심장병 있음": "#E45756"
+        }
+    )
+
+    fig_heart.update_traces(
+        texttemplate="%{text:.2f}%",
+        textposition="outside"
+    )
+
+    fig_heart.update_layout(
+        showlegend=False,
+        yaxis_title="뇌졸중 비율 (%)",
+        xaxis_title="심장병 여부"
+    )
+
+    st.plotly_chart(
+        fig_heart,
+        use_container_width=True
+    )
+
+
+# 비율 표
+st.subheader("질병 여부별 상세 수치")
+
+rate_table = pd.DataFrame({
+    "구분": [
+        "고혈압 없음",
+        "고혈압 있음",
+        "심장병 없음",
+        "심장병 있음"
+    ],
+    "전체 사람 수": [
+        hypertension_df.iloc[0]["전체_사람수"],
+        hypertension_df.iloc[1]["전체_사람수"],
+        heart_df.iloc[0]["전체_사람수"],
+        heart_df.iloc[1]["전체_사람수"]
+    ],
+    "뇌졸중 인원": [
+        hypertension_df.iloc[0]["뇌졸중_인원"],
+        hypertension_df.iloc[1]["뇌졸중_인원"],
+        heart_df.iloc[0]["뇌졸중_인원"],
+        heart_df.iloc[1]["뇌졸중_인원"]
+    ],
+    "뇌졸중 비율 (%)": [
+        hypertension_df.iloc[0]["뇌졸중_비율"],
+        hypertension_df.iloc[1]["뇌졸중_비율"],
+        heart_df.iloc[0]["뇌졸중_비율"],
+        heart_df.iloc[1]["뇌졸중_비율"]
+    ]
+})
+
+rate_table["뇌졸중 비율 (%)"] = (
+    rate_table["뇌졸중 비율 (%)"].round(2)
+)
+
+st.dataframe(
+    rate_table,
+    use_container_width=True,
+    hide_index=True
+)
+
+
+st.divider()
+
+
+# ==========================================
+# 7. BMI 결측치 분석
+# ==========================================
+
+st.header("4. BMI가 비어 있는 사람들의 뇌졸중 비율")
+
+st.markdown(
+    """
+    체질량지수(bmi)가 비어 있는 사람들만 따로 살펴봅니다.
+
+    BMI가 비어 있는 사람들의 뇌졸중 비율과
+    전체 사람들의 뇌졸중 비율을 비교합니다.
+    """
+)
+
+
+# BMI 결측치 데이터
+missing_bmi_df = df[df["bmi"].isna()]
+
+
+# BMI 결측치 집단
+missing_bmi_count = len(missing_bmi_df)
+
+missing_bmi_stroke_count = int(
+    (missing_bmi_df["stroke"] == 1).sum()
+)
+
+missing_bmi_rate = (
+    missing_bmi_stroke_count / missing_bmi_count * 100
+    if missing_bmi_count > 0
+    else 0
+)
+
+
+# 전체 데이터
+total_count = len(df)
+
+total_stroke_count = int(
+    (df["stroke"] == 1).sum()
+)
+
+total_stroke_rate = (
+    total_stroke_count / total_count * 100
+    if total_count > 0
+    else 0
+)
+
+
+bmi_comparison = pd.DataFrame({
+
+    "비교 대상": [
+        "BMI가 비어 있는 사람",
+        "전체 사람"
+    ],
+
+    "전체 사람 수": [
+        missing_bmi_count,
+        total_count
+    ],
+
+    "뇌졸중 인원": [
+        missing_bmi_stroke_count,
+        total_stroke_count
+    ],
+
+    "뇌졸중 비율 (%)": [
+        round(missing_bmi_rate, 2),
+        round(total_stroke_rate, 2)
+    ]
+
+})
+
+
+st.dataframe(
+    bmi_comparison,
+    use_container_width=True,
+    hide_index=True
+)
+
+
+st.info(
+    "BMI 결측 집단의 비율이 전체 비율과 다르더라도, "
+    "그 차이만으로 BMI 결측이 뇌졸중의 원인이라고 판단할 수는 없습니다."
+)
+
+
+st.divider()
+
+
+# ==========================================
+# 8. 흡연 상태별 사람 수
+# ==========================================
+
+st.header("5. 흡연 상태별 사람 수")
+
+st.markdown(
+    """
+    흡연 상태(smoking_status)에 어떤 값들이 있는지 확인하고
+    각 상태에 해당하는 사람 수를 살펴봅니다.
+    """
+)
+
+
+smoking_count = (
+    df["smoking_status"]
+    .fillna("결측")
+    .value_counts()
+    .rename_axis("흡연 상태")
+    .reset_index(name="사람 수")
+)
+
+
+st.dataframe(
+    smoking_count,
+    use_container_width=True,
+    hide_index=True
+)
+
+
+# 흡연 상태별 그래프
+fig_smoking = px.bar(
+    smoking_count,
+    x="흡연 상태",
+    y="사람 수",
+    text="사람 수",
+    title="흡연 상태별 사람 수",
+    color="흡연 상태",
+    color_discrete_sequence=px.colors.qualitative.Set2
+)
+
+fig_smoking.update_traces(
+    textposition="outside"
+)
+
+fig_smoking.update_layout(
+    showlegend=False,
+    xaxis_title="흡연 상태",
+    yaxis_title="사람 수"
+)
+
+st.plotly_chart(
+    fig_smoking,
+    use_container_width=True
+)
+
+
+# ==========================================
+# 9. 마무리
+# ==========================================
+
+st.divider()
+
+st.header("🎯 탐색 결과 정리")
+
+st.markdown(
+    """
+    이번 탐색에서는 다음 내용을 살펴보았습니다.
+
+    - 나이와 평균 혈당의 분포
+    - 뇌졸중 여부에 따른 나이와 혈당의 차이
+    - 고혈압 및 심장병 여부에 따른 뇌졸중 비율
+    - BMI 결측치가 있는 사람들의 뇌졸중 비율
+    - 흡연 상태별 사람 수
+
+    **주의:** 그래프에서 확인한 차이는 데이터의 통계적 관계를 보여주는 것이며,
+    특정 건강 상태가 뇌졸중을 직접 일으킨다는 인과관계를 증명하지는 않습니다.
     """
 )
