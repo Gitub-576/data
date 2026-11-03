@@ -1,3 +1,35 @@
+import json
+from pathlib import Path
+
+import pandas as pd
+import plotly.express as px
+import streamlit as st
+
+
+# --------------------------------------------------
+# 기본 설정
+# --------------------------------------------------
+APP_TITLE = "뇌졸중 예측 실습실"
+DATA_URL = "https://raw.githubusercontent.com/greatsong/modudata/main/data/stroke.csv"
+RECORD_DIR = Path("내_기록")
+RECORD_FILE = RECORD_DIR / "stroke_column_notes.json"
+
+st.set_page_config(
+    page_title=APP_TITLE,
+    page_icon="🧠",
+    layout="wide",
+)
+
+
+# --------------------------------------------------
+# 기록 파일 불러오기 / 저장하기
+# --------------------------------------------------
+def load_notes():
+    """저장된 우리말 뜻과 데이터 출처를 불러온다."""
+    if RECORD_FILE.exists():
+        try:
+            with RECORD_FILE.open("r", encoding="utf-8") as file:
+                saved = json.load(file)
             return saved
         except (json.JSONDecodeError, OSError):
             st.warning("기록 파일을 읽지 못해 빈 기록으로 시작합니다.")
