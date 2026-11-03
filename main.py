@@ -1,13 +1,14 @@
 
-import streamlit as st
-import pandas as pd
 import json
-import os
+from pathlib import Path
+
+import pandas as pd
+import streamlit as st
 
 
-# ==========================================
-# 1. 페이지 설정
-# ==========================================
+# --------------------------------------------------
+# 1. 기본 설정
+# --------------------------------------------------
 
 st.set_page_config(
     page_title="뇌졸중 예측 실습실",
@@ -15,18 +16,16 @@ st.set_page_config(
     layout="wide"
 )
 
-
-# ==========================================
-# 2. 기본 설정
-# ==========================================
+st.title("🧠 뇌졸중 예측 실습실")
+st.caption("데이터를 살펴보고 뇌졸중 예측을 위한 기초를 학습하는 공간입니다.")
 
 DATA_URL = (
     "https://raw.githubusercontent.com/"
     "greatsong/modudata/main/data/stroke.csv"
 )
 
-SAVE_FOLDER = "내_기록"
-SAVE_FILE = os.path.join(SAVE_FOLDER, "기록.json")
+RECORD_DIR = Path("내_기록")
+RECORD_FILE = RECORD_DIR / "설명_기록.json"
 
 COLUMNS = [
     "id",
@@ -44,83 +43,32 @@ COLUMNS = [
 ]
 
 
-# ==========================================
-# 3. 데이터 불러오기
-# ==========================================
-
-@st.cache_data
-def load_data():
-    df = pd.read_csv(
-        DATA_URL,
-        encoding="utf-8"
-    )
-    return df
-
-
-try:
-    df = load_data()
-
-except Exception as e:
-    st.error("데이터를 불러오는 중 오류가 발생했습니다.")
-    st.error(str(e))
-    st.stop()
-
-
-# ==========================================
-# 4. 기록 불러오기
-# ==========================================
+# --------------------------------------------------
+# 2. 기록 파일 불러오기 및 저장하기
+# --------------------------------------------------
 
 def load_records():
-
-    if os.path.exists(SAVE_FILE):
-
+    """기존 JSON 기록을 불러옵니다."""
+    if RECORD_FILE.exists():
         try:
-            with open(
-                SAVE_FILE,
-                "r",
-                encoding="utf-8"
-            ) as file:
-
+            with open(RECORD_FILE, "r", encoding="utf-8") as file:
                 return json.load(file)
-
         except (json.JSONDecodeError, OSError):
-            return {
-                "translations": {},
-                "source": ""
-            }
+            return {}
 
-    return {
-        "translations": {},
-        "source": ""
-    }
+    return {}
 
 
-if "records" not in st.session_state:
-    st.session_state.records = load_records()
-
-
-# ==========================================
-# 5. 기록 저장하기
-# ==========================================
-
-def save_records(translations, source):
-
-    os.makedirs(
-        SAVE_FOLDER,
-        exist_ok=True
-    )
+def save_records(meanings, source):
+    """우리말 뜻과 데이터 출처를 JSON으로 저장합니다."""
+    RECORD_DIR.mkdir(parents=True, exist_ok=True)
 
     records = {
-        "translations": translations,
+        "meanings": meanings,
         "source": source
     }
 
-    with open(
-        SAVE_FILE,
-        "w",
-        encoding="utf-8"
-    ) as file:
-
+    with open(RECORD_FILE, "w", encoding="utf-8") as file:
         json.dump(
             records,
             file,
@@ -128,61 +76,74 @@ def save_records(translations, source):
             indent=4
         )
 
-    st.session_state.records = records
+
+# --------------------------------------------------
+# 3. 데이터 불러오기
+# --------------------------------------------------
+
+@st.cache_data
+def load_data():
+    """CSV 파일을 다운로드하고 읽어옵니다."""
+    df = pd.read_csv(
+        DATA_URL,
+        encoding="utf-8"
+    )
+
+    return df
 
 
-# ==========================================
-# 6. 앱 제목
-# ==========================================
+try:
+    df = load_data()
 
-st.title("🧠 뇌졸중 예측 실습실")
-
-st.markdown(
-    """
-    뇌졸중 예측에 사용되는 데이터를 살펴보고,
-    데이터의 구조와 각 변수의 의미를 학습하는 공간입니다.
-
-    먼저 데이터를 탐색하고 각 열의 의미를 직접 정리해 봅시다.
-    """
-)
-
-st.divider()
+except Exception as e:
+    st.error("데이터를 불러오는 중 문제가 발생했습니다.")
+    st.error(f"오류 내용: {e}")
+    st.info("인터넷 연결을 확인한 후 다시 실행해 주세요.")
+    st.stop()
 
 
-# ==========================================
-# 7. 데이터 소개
-# ==========================================
+# --------------------------------------------------
+# 4. 기존 기록 불러오기
+# --------------------------------------------------
+
+records = load_records()
+
+saved_meanings = records.get("meanings", {})
+saved_source = records.get("source", "")
+
+
+# --------------------------------------------------
+# 5. 데이터 소개
+# --------------------------------------------------
 
 st.header("📊 데이터 소개")
 
 st.markdown(
     """
-    이 데이터는 사람들의 건강 상태와 생활 습관 정보를 담고 있으며,
-    뇌졸중 발생 여부를 예측하는 데 활용할 수 있습니다.
+    이 데이터는 사람들의 건강 및 생활 습관 정보와
+    뇌졸중 발생 여부를 담고 있습니다.
 
-    한 행은 한 사람의 정보를 나타내며,
-    `stroke` 열은 뇌졸중 발생 여부를 나타냅니다.
+    각 행은 한 사람의 정보를 나타내며,
+    `stroke` 열을 통해 뇌졸중 발생 여부를 확인할 수 있습니다.
     """
 )
 
-
-# ==========================================
-# 8. 주요 통계 카드
-# ==========================================
-
+# 주요 통계 계산
 total_people = len(df)
-
 total_columns = len(df.columns)
-
-stroke_count = int(
-    (df["stroke"] == 1).sum()
-)
-
+stroke_count = int((df["stroke"] == 1).sum())
 stroke_ratio = (
     stroke_count / total_people * 100
     if total_people > 0
     else 0
 )
+
+
+# --------------------------------------------------
+# 6. 숫자 카드 4개
+# --------------------------------------------------
+
+st.subheader("전체 데이터 요약")
 
 col1, col2, col3, col4 = st.columns(4)
 
@@ -214,237 +175,151 @@ with col4:
 st.divider()
 
 
-# ==========================================
-# 9. 열 이름 및 변수 정보
-# ==========================================
+# --------------------------------------------------
+# 7. 열 정보 표
+# --------------------------------------------------
 
-st.header("📝 데이터 열 살펴보기")
+st.header("📝 열 이름과 우리말 뜻")
 
-st.markdown(
-    """
-    각 열의 우리말 뜻을 교재를 참고하여 직접 작성해 보세요.
-
-    작성한 내용은 저장 버튼을 누르면 자동으로 JSON 파일에 저장됩니다.
-    """
+st.write(
+    "각 열의 우리말 뜻을 교재에서 찾아 직접 입력해 보세요. "
+    "입력한 내용은 자동으로 JSON 파일에 저장됩니다."
 )
 
-
-# 기존에 저장된 우리말 뜻
-saved_translations = st.session_state.records.get(
-    "translations", {}
-)
-
-
-# 열별 정보 만들기
+# 열별 정보 구성
 column_info = []
 
 for column in df.columns:
 
-    unique_count = df[column].nunique(
-        dropna=True
-    )
+    # 값의 종류
+    unique_count = df[column].nunique(dropna=True)
 
-    # 값의 종류 구분
     if pd.api.types.is_numeric_dtype(df[column]):
-
-        if unique_count <= 10:
-            value_type = "범주형"
-        else:
-            value_type = "수치형"
-
+        value_type = f"수치형 ({unique_count}종류)"
     else:
-        value_type = "범주형"
+        value_type = f"범주형 ({unique_count}종류)"
+
+    # 빈 값 개수
+    missing_count = int(df[column].isna().sum())
 
     column_info.append({
-
         "열 이름": column,
-
-        "우리말 뜻": saved_translations.get(
-            column, ""
-        ),
-
+        "우리말 뜻": saved_meanings.get(column, ""),
         "값의 종류": value_type,
-
-        "빈 값 개수": int(
-            df[column].isna().sum()
-        )
-
+        "빈 값 개수": missing_count
     })
-
 
 info_df = pd.DataFrame(column_info)
 
-
-# 편집 가능한 데이터 표
+# 우리말 뜻만 편집 가능
 edited_df = st.data_editor(
-
     info_df,
-
     use_container_width=True,
-
     hide_index=True,
-
     disabled=[
         "열 이름",
         "값의 종류",
         "빈 값 개수"
     ],
-
     column_config={
-
         "열 이름": st.column_config.TextColumn(
             "열 이름",
             width="medium"
         ),
-
         "우리말 뜻": st.column_config.TextColumn(
             "우리말 뜻 (직접 입력)",
             width="large"
         ),
-
         "값의 종류": st.column_config.TextColumn(
-            "값의 종류",
-            width="medium"
+            "값의 종류"
         ),
-
         "빈 값 개수": st.column_config.NumberColumn(
             "빈 값 개수",
-            width="small"
+            format="%d"
         )
-
     },
-
-    key="column_editor"
-
+    key="meaning_editor"
 )
 
+# 수정된 우리말 뜻 저장
+current_meanings = {}
 
-# ==========================================
-# 10. 데이터 처음 다섯 줄
-# ==========================================
+for _, row in edited_df.iterrows():
+    current_meanings[row["열 이름"]] = row["우리말 뜻"]
+
+try:
+    save_records(
+        current_meanings,
+        saved_source
+    )
+    st.caption("💾 우리말 뜻이 자동 저장되었습니다.")
+
+except OSError as e:
+    st.error(f"기록 저장에 실패했습니다: {e}")
+
 
 st.divider()
 
-st.header("🔍 데이터 미리보기")
 
-st.markdown(
-    """
-    실제 CSV 파일에 저장된 데이터의 처음 다섯 행입니다.
-    """
-)
+# --------------------------------------------------
+# 8. 데이터 처음 다섯 줄
+# --------------------------------------------------
+
+st.header("🔎 데이터 미리 보기")
+
+st.write("실제 CSV 데이터의 처음 다섯 줄입니다.")
 
 st.dataframe(
-
     df.head(5),
-
     use_container_width=True,
-
     hide_index=True
-
 )
 
 
-# ==========================================
-# 11. 데이터 출처 입력
-# ==========================================
-
 st.divider()
+
+
+# --------------------------------------------------
+# 9. 데이터 출처 입력
+# --------------------------------------------------
 
 st.header("📚 데이터 출처")
 
-st.markdown(
-    """
-    교재에 소개된 데이터 출처를 아래에 작성해 보세요.
-    """
-)
-
-saved_source = st.session_state.records.get(
-    "source", ""
+st.write(
+    "교재에 안내된 데이터 출처를 아래에 입력하세요. "
+    "입력한 내용은 저장 버튼을 누르면 보관됩니다."
 )
 
 source_text = st.text_area(
-
-    "데이터 출처 작성",
-
+    "데이터 출처",
     value=saved_source,
-
-    placeholder="교재를 참고하여 데이터 출처를 입력하세요.",
-
+    placeholder="교재에 있는 데이터 출처를 입력하세요.",
     height=120,
-
     key="source_editor"
-
 )
 
+if st.button(
+    "💾 데이터 출처 저장",
+    type="primary"
+):
+    try:
+        save_records(
+            current_meanings,
+            source_text
+        )
+        st.success("데이터 출처가 저장되었습니다!")
 
-# ==========================================
-# 12. 저장 버튼
-# ==========================================
-
-st.divider()
-
-col_save, col_info = st.columns([1, 3])
-
-with col_save:
-
-    if st.button(
-        "💾 기록 저장하기",
-        use_container_width=True,
-        type="primary"
-    ):
-
-        translations = {}
-
-        for _, row in edited_df.iterrows():
-
-            translations[row["열 이름"]] = (
-                row["우리말 뜻"]
-                if pd.notna(row["우리말 뜻"])
-                else ""
-            )
-
-        try:
-
-            save_records(
-                translations,
-                source_text
-            )
-
-            st.success(
-                "우리말 뜻과 데이터 출처가 저장되었습니다!"
-            )
-
-        except OSError as e:
-
-            st.error(
-                f"파일 저장 중 오류가 발생했습니다: {e}"
-            )
+    except OSError as e:
+        st.error(f"기록 저장에 실패했습니다: {e}")
 
 
-with col_info:
-
-    st.caption(
-        "저장된 내용은 내_기록/기록.json 파일에 보관됩니다. "
-        "앱을 다시 실행하거나 새로고침해도 저장된 내용을 불러옵니다."
-    )
-
-
-# ==========================================
-# 13. 마무리
-# ==========================================
+st.caption(
+    "저장 위치: 내_기록/설명_기록.json"
+)
 
 st.divider()
 
-st.markdown(
-    """
-    ### 🎯 학습 목표
-
-    - 데이터의 전체적인 구조 이해하기
-    - 각 열의 의미 파악하기
-    - 결측치가 있는 열 확인하기
-    - 뇌졸중 발생 여부(`stroke`) 이해하기
-
-    **이제 데이터를 직접 살펴보며 뇌졸중 예측을 위한
-    첫 번째 데이터 탐색을 시작해 봅시다!**
-    """
+st.caption(
+    "※ 이 실습실은 데이터 탐색과 머신러닝 학습을 위한 교육용 앱입니다. "
+    "실제 의료 진단이나 뇌졸중 위험 판정에 사용하지 마세요."
 )
